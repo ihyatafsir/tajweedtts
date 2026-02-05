@@ -132,16 +132,18 @@ def distribute_timing(graphemes: list[dict], original_timing: list[dict]) -> lis
                 'weight': matched.get('weight', 1.0)
             })
         elif aligned_timing:
+            # Silent letter: share timing with previous (don't advance time)
             prev = aligned_timing[-1]
             aligned_timing.append({
                 'idx': i,
                 'char': grapheme_char,
                 'ayah': g['ayah'],
-                'start': prev['end'],
-                'end': prev['end'] + 100,
-                'duration': 100,
+                'start': prev['start'],  # Same start as previous
+                'end': prev['end'],      # Same end as previous
+                'duration': prev['duration'],
                 'wordIdx': g['wordIdx'],
-                'weight': 1.0
+                'weight': 0.0,  # Mark as silent
+                'silent': True
             })
     
     return aligned_timing
