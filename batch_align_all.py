@@ -104,11 +104,11 @@ def distribute_timing(graphemes: list[dict], original_timing: list[dict]) -> lis
         base_letter = strip_diacritics(grapheme_char)
         
         # Try to find matching original timing entry
+        # STRICTLY FORWARD: only search ahead from current position
         matched = None
-        search_start = max(0, orig_idx - 2)
         search_end = min(len(filtered_timing), orig_idx + 10)
         
-        for j in range(search_start, search_end):
+        for j in range(orig_idx, search_end):
             orig_char = filtered_timing[j]['char']
             orig_base = strip_diacritics(orig_char)
             if orig_base == base_letter or orig_char in grapheme_char or base_letter in orig_char:
