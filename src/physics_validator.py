@@ -91,9 +91,9 @@ class PhysicsValidator:
     GHUNNAH_MIN_DURATION_MS = 80.0
     TAFKHEEM_F2_MAX_HZ = 1200.0  # Heavy letters have depressed F2
     
-    # Precision thresholds
-    MIN_SEGMENT_MS = 50.0  # Minimum segment duration for valid analysis
-    MIN_SEGMENT_SAMPLES = 1102  # ~50ms at 22050 Hz
+    # Precision thresholds - tuned for Arabic letters which can be very short
+    MIN_SEGMENT_MS = 30.0  # Minimum segment duration for valid analysis (lowered from 50ms)
+    MIN_SEGMENT_SAMPLES = 661  # ~30ms at 22050 Hz
     
     def __init__(self, sample_rate: int = 22050):
         self.sample_rate = sample_rate
@@ -177,13 +177,24 @@ class PhysicsValidator:
                 rms_profile="unknown"
             )
         
-        # Extract segment with bounds checking
-        start_sample = max(0, int(start * self.sample_rate))
-        end_sample = min(len(audio), int(end * self.sample_rate))
-        segment = audio[start_sample:end_sample]
+        # PRECISION: Use safe extraction
+        segment, is_valid, error = self.safe_extract_segment(audio, start, end)
         
-        # PRECISION: Skip segments that are too short for reliable analysis
-        if len(segment) < self.MIN_SEGMENT_SAMPLES:
+        if not is_valid:
+            return QalqalahResult(
+                status=ValidationStatus.SKIPPED,
+                metric_name="RMS Energy",
+                expected_pattern="dip_then_spike",
+                observed_pattern=error or "invalid_segment",
+                score=0.0,
+                rms_profile="unknown",
+                details={"reason": error}
+            )
+        
+        # PRECISION: Use safe RMS with NaN protection
+        rms = self.safe_rms(segment)
+        
+        if len(rms) < 3:
             return QalqalahResult(
                 status=ValidationStatus.SKIPPED,
                 metric_name="RMS Energy",
@@ -191,22 +202,7 @@ class PhysicsValidator:
                 observed_pattern="insufficient_frames",
                 score=0.0,
                 rms_profile="unknown",
-                details={"reason": f"Segment {len(segment)} samples < {self.MIN_SEGMENT_SAMPLES} minimum"}
-            )
-        
-        # Calculate RMS in frames
-        frame_length = 256
-        hop_length = 64
-        rms = librosa.feature.rms(y=segment, frame_length=frame_length, hop_length=hop_length)[0]
-        
-        if len(rms) < 3:
-            return QalqalahResult(
-                status=ValidationStatus.FAIL,
-                metric_name="RMS Energy",
-                expected_pattern="dip_then_spike",
-                observed_pattern="insufficient_frames",
-                score=0.0,
-                rms_profile="unknown"
+                details={"reason": f"Only {len(rms)} RMS frames < 3 minimum"}
             )
         
         # Analyze RMS pattern
@@ -241,10 +237,10 @@ class PhysicsValidator:
             status = ValidationStatus.FAIL
             score = 0.0
         
-        # Estimate closure duration
+        # Estimate closure duration (using safe_rms default hop_length=64)
         if dip_idx > 0:
             frames_to_dip = dip_idx
-            closure_duration_ms = (frames_to_dip * hop_length / self.sample_rate) * 1000
+            closure_duration_ms = (frames_to_dip * 64 / self.sample_rate) * 1000
         else:
             closure_duration_ms = 0.0
         
@@ -341,18 +337,27 @@ class PhysicsValidator:
         # Check minimum duration
         if duration_ms < self.GHUNNAH_MIN_DURATION_MS:
             return GhunnahResult(
-                status=ValidationStatus.FAIL,
+                status=ValidationStatus.MARGINAL,  # PRECISION: Changed from FAIL to MARGINAL
                 metric_name="Formant Analysis",
                 expected_pattern="nasal_resonance",
-                observed_pattern="too_short",
-                score=0.0,
-                duration_elongation=duration_ms / self.GHUNNAH_MIN_DURATION_MS
+                observed_pattern="short_but_valid",
+                score=duration_ms / self.GHUNNAH_MIN_DURATION_MS,
+                duration_elongation=duration_ms / self.GHUNNAH_MIN_DURATION_MS,
+                details={"reason": f"Duration {duration_ms:.1f}ms < {self.GHUNNAH_MIN_DURATION_MS}ms minimum"}
             )
         
-        # Extract segment
-        start_sample = int(start * self.sample_rate)
-        end_sample = int(end * self.sample_rate)
-        segment = audio[start_sample:end_sample]
+        # PRECISION: Use safe extraction
+        segment, is_valid, error = self.safe_extract_segment(audio, start, end)
+        
+        if not is_valid:
+            return GhunnahResult(
+                status=ValidationStatus.SKIPPED,
+                metric_name="Formant Analysis",
+                expected_pattern="nasal_resonance",
+                observed_pattern=error or "invalid_segment",
+                score=0.0,
+                details={"reason": error}
+            )
         
         # Convert to Praat Sound object
         try:
@@ -433,10 +438,18 @@ class PhysicsValidator:
                 score=0.0
             )
         
-        # Extract segment
-        start_sample = int(start * self.sample_rate)
-        end_sample = int(end * self.sample_rate)
-        segment = audio[start_sample:end_sample]
+        # PRECISION: Use safe extraction
+        segment, is_valid, error = self.safe_extract_segment(audio, start, end)
+        
+        if not is_valid:
+            return TafkheemResult(
+                status=ValidationStatus.SKIPPED,
+                metric_name="F2 Formant",
+                expected_pattern=f"F2 < {self.TAFKHEEM_F2_MAX_HZ} Hz",
+                observed_pattern=error or "invalid_segment",
+                score=0.0,
+                details={"reason": error}
+            )
         
         try:
             import tempfile

@@ -76,8 +76,9 @@ def refine_with_physics(timing_data, tags, audio, sr, physics, duration_model):
         
         # Copy existing data
         result = entry.copy()
-        start = entry['start']
-        end = entry['end']
+        # CRITICAL PRECISION FIX: Times are stored in milliseconds, convert to seconds
+        start = entry['start'] / 1000.0
+        end = entry['end'] / 1000.0
         
         # Get corresponding Tajweed tag
         if i < len(tags):
