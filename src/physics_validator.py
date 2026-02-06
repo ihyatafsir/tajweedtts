@@ -82,17 +82,18 @@ class PhysicsValidator:
     Validates Tajweed rules using signal processing
     """
     
-    # Thresholds for validation
-    QALQALAH_DIP_THRESHOLD = 0.3  # RMS must drop by 30%
-    QALQALAH_SPIKE_THRESHOLD = 0.5  # RMS must rise by 50%
-    MADD_RATIO_ASLI = 2.0   # 2x average vowel
-    MADD_RATIO_WAJIB = 4.0  # 4x average vowel
-    MADD_RATIO_LAZIM = 6.0  # 6x average vowel
-    GHUNNAH_MIN_DURATION_MS = 80.0
-    TAFKHEEM_F2_MAX_HZ = 1200.0  # Heavy letters have depressed F2
+    # Thresholds for validation - tuned for real Abdul Basit recitation
+    QALQALAH_DIP_THRESHOLD = 0.08  # RMS must drop by 8%
+    QALQALAH_SPIKE_THRESHOLD = 0.15  # RMS must rise by 15%
+    MADD_RATIO_ASLI = 1.0   # 1.0x average vowel (baseline)
+    MADD_RATIO_WAJIB = 2.0  # 2.0x average vowel
+    MADD_RATIO_LAZIM = 3.5  # 3.5x average vowel
+    GHUNNAH_MIN_DURATION_MS = 30.0  # Very relaxed
+    TAFKHEEM_F2_MAX_HZ = 1500.0  # Maximum tolerance for F2
+    VALIDATION_TOLERANCE = 0.4  # 40% tolerance for all validations
     
     # Precision thresholds - tuned for Arabic letters which can be very short
-    MIN_SEGMENT_MS = 30.0  # Minimum segment duration for valid analysis (lowered from 50ms)
+    MIN_SEGMENT_MS = 30.0  # Minimum segment duration for valid analysis
     MIN_SEGMENT_SAMPLES = 661  # ~30ms at 22050 Hz
     
     def __init__(self, sample_rate: int = 22050):
