@@ -19,6 +19,10 @@ output/
 *.mp4
 *.wav
 
+# Downloads (large recitation videos)
+downloads/
+input_video.mp4
+
 # OS
 .DS_Store
 Thumbs.db
